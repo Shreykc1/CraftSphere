@@ -6,7 +6,10 @@ import { Player } from './player';
 import { Physics } from './physics';
 import { setupUI } from './ui';
 import { ModelLoader } from './modelLoader';
+import { Devil } from './devil';
 
+let devil;
+let devilIsDead = false;
 // UI Setup
 const stats = new Stats();
 document.body.appendChild(stats.dom);
@@ -67,8 +70,18 @@ function setupLights() {
   scene.add(ambient);
 }
 
+
+function spawnDevil() {
+  console.log('Spawning new devil');
+  devil = new Devil(scene, world, player);
+  window.devil = devil;
+  devilIsDead = false;
+  }
+let devilRespawnTimer = 0;
+const DEVIL_RESPAWN_DELAY = 5; // 5 seconds delay
 // Render loop
 let previousTime = performance.now();
+
 function animate() {
   requestAnimationFrame(animate);
 
@@ -81,13 +94,20 @@ function animate() {
     player.update(world);
     world.update(player);
 
+    // Update devil
+    if (devil) {
+        devil.update(dt);
+    } else if(!devilIsDead) {
+            spawnDevil();
+    }
+
     // Position the sun relative to the player. Need to adjust both the
     // position and target of the sun to keep the same sun angle
     sun.position.copy(player.camera.position);
     sun.position.sub(new THREE.Vector3(-50, -50, -50));
     sun.target.position.copy(player.camera.position);
 
-    // Update positon of the orbit camera to track player 
+    // Update positon of the orbit camera to track player
     orbitCamera.position.copy(player.position).add(new THREE.Vector3(16, 16, 16));
     controls.target.copy(player.position);
   }
@@ -110,4 +130,8 @@ window.addEventListener('resize', () => {
 
 setupUI(world, player, physics, scene);
 setupLights();
+player.updateHealthBar();
+// Create the devil after the scene is set up
+devil = new Devil(scene, world, player);
+window.devil = devil
 animate();

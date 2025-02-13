@@ -6,6 +6,13 @@ import { blocks } from './blocks';
 const CENTER_SCREEN = new THREE.Vector2();
 
 export class Player {
+  maxHealth = 100;
+  health = 100;
+  regenRate = 2; // Health regenerated per second
+  regenDelay = 5; // Time in seconds after taking damage before regen starts
+  lastDamageTime = 0; // Time of the last damage taken
+
+
   height = 1.75;
   radius = 0.5;
   maxSpeed = 5;
@@ -82,6 +89,63 @@ export class Player {
     document.addEventListener('mousedown', this.onMouseDown.bind(this));
   }
 
+
+  takeDamage(amount) {
+    this.health -= amount;
+    this.health = Math.max(0, this.health); // Prevent health from going below 0
+    this.updateHealthBar();
+    this.lastDamageTime = performance.now() / 1000; // Update last damage time
+    if (this.health <= 0) {
+      this.die();
+    }
+  }
+
+  heal(amount) {
+    this.health += amount;
+    this.health = Math.min(this.maxHealth, this.health); // Prevent overhealing
+    this.updateHealthBar();
+  }
+
+  die() {
+    // Handle player death (e.g., respawn, game over)
+    console.log('Player has died!');
+    this.position.y = 32;
+    this.velocity.set(0, 0, 0);
+    // Reset health for respawn
+    this.health = this.maxHealth;
+    this.updateHealthBar();
+    this.regenerateHealth();
+  }
+  regenerateHealth() {
+    const currentTime = performance.now() / 1000; // Get current time in seconds
+
+    if (currentTime - this.lastDamageTime >= this.regenDelay &&
+      this.health < this.maxHealth) {
+      const regenAmount = this.regenRate * (currentTime - this.lastDamageTime);
+      this.heal(regenAmount);
+      this.lastDamageTime = currentTime; // Reset lastDamageTime to prevent instant regen
+    }
+  }
+
+  updateHealthBar() {
+    const healthBar = document.getElementById('health-bar');
+    const healthPoints = document.getElementById('health-points');
+
+    const healthPercentage = (this.health / this.maxHealth) * 100;
+    healthBar.style.width = `${healthPercentage}%`;
+    healthPoints.innerText = this.health;
+
+    // Change color based on health
+    if (healthPercentage > 50) {
+      healthBar.style.backgroundColor = 'green';
+    } else if (healthPercentage > 20) {
+      healthBar.style.backgroundColor = 'yellow';
+    } else {
+      healthBar.style.backgroundColor = 'red';
+    }
+  }
+
+
   onCameraLock() {
     document.getElementById('overlay').style.visibility = 'hidden';
   }
@@ -94,7 +158,7 @@ export class Player {
 
   /**
    * Updates the state of the player
-   * @param {World} world 
+   * @param {World} world
    */
   update(world) {
     this.updateBoundsHelper();
@@ -107,7 +171,7 @@ export class Player {
 
   /**
    * Updates the raycaster used for block selection
-   * @param {World} world 
+   * @param {World} world
    */
   updateRaycaster(world) {
     this.raycaster.setFromCamera(CENTER_SCREEN, this.camera);
@@ -145,7 +209,7 @@ export class Player {
 
   /**
    * Updates the state of the player based on the current user inputs
-   * @param {Number} dt 
+   * @param {Number} dt
    */
   applyInputs(dt) {
     if (this.controls.isLocked === true) {
@@ -174,7 +238,7 @@ export class Player {
 
   /**
    * Set the tool object the player is holding
-   * @param {THREE.Mesh} tool 
+   * @param {THREE.Mesh} tool
    */
   setTool(tool) {
     this.tool.container.clear();
@@ -218,7 +282,7 @@ export class Player {
 
   /**
    * Applies a change in velocity 'dv' that is specified in the world frame
-   * @param {THREE.Vector3} dv 
+   * @param {THREE.Vector3} dv
    */
   applyWorldDeltaVelocity(dv) {
     dv.applyEuler(new THREE.Euler(0, -this.camera.rotation.y, 0));
@@ -227,7 +291,7 @@ export class Player {
 
   /**
    * Event handler for 'keyup' event
-   * @param {KeyboardEvent} event 
+   * @param {KeyboardEvent} event
    */
   onKeyDown(event) {
     if (!this.controls.isLocked) {
@@ -290,7 +354,7 @@ export class Player {
 
   /**
    * Event handler for 'keyup' event
-   * @param {KeyboardEvent} event 
+   * @param {KeyboardEvent} event
    */
   onKeyUp(event) {
     switch (event.code) {
@@ -315,10 +379,18 @@ export class Player {
 
   /**
    * Event handler for 'mousedown'' event
-   * @param {MouseEvent} event 
+   * @param {MouseEvent} event
    */
   onMouseDown(event) {
     if (this.controls.isLocked) {
+
+        if (this.isDevilNearby()) {
+            this.attackDevil();
+            this.triggerToolAnimation(); // Trigger the pickaxe animation
+            return; // Don't remove a block if we hit the devil
+          }
+
+
       // Is a block selected?
       if (this.selectedCoords) {
         // If active block is an empty block, then we are in delete mode
@@ -336,21 +408,58 @@ export class Player {
             this.activeBlockId
           );
         }
-
+        this.triggerToolAnimation();
         // If the tool isn't currently animating, trigger the animation
-        if (!this.tool.animate) {
-          this.tool.animate = true;
-          this.tool.animationStart = performance.now();
+        // if (!this.tool.animate) {
+        //   this.tool.animate = true;
+        //   this.tool.animationStart = performance.now();
 
-          // Clear the existing timeout so it doesn't cancel our new animation
-          clearTimeout(this.tool.animation);
+        //   // Clear the existing timeout so it doesn't cancel our new animation
+        //   clearTimeout(this.tool.animation);
 
-          // Stop the animation after 1.5 cycles
-          this.tool.animation = setTimeout(() => {
-            this.tool.animate = false;
-          }, 3 * Math.PI / this.tool.animationSpeed);
-        }
+        //   // Stop the animation after 1.5 cycles
+        //   this.tool.animation = setTimeout(() => {
+        //     this.tool.animate = false;
+        //   }, 3 * Math.PI / this.tool.animationSpeed);
+        // }
       }
+    }
+  }
+
+  /**
+   * Checks if the devil is within a certain range of the player
+   * @returns {boolean}
+   */
+  isDevilNearby() {
+    if (!window.devil || !window.devil.mesh) return false; 
+
+    const distance = this.position.distanceTo(window.devil.mesh.position);
+    return distance < 3; // Adjust the range as needed
+  }
+
+  /**
+   * Attacks the devil, dealing damage
+   */
+  attackDevil() {
+    if (window.devil) {
+      window.devil.takeDamage(10); // Adjust damage amount as needed
+      console.log('Player attacked devil!');
+    }
+  }
+
+  triggerToolAnimation() {
+    // If the tool isn't currently animating, trigger the animation
+    if (!this.tool.animate) {
+      this.tool.animate = true;
+      this.tool.animationStart = performance.now();
+
+      // Clear the existing timeout so it doesn't cancel our new animation
+      clearTimeout(this.tool.animation);
+
+      // Stop the animation after 1.5 cycles
+      this.tool.animation = setTimeout(() => {
+        this.tool.animate = false;
+      }, (3 * Math.PI) / this.tool.animationSpeed);
     }
   }
 

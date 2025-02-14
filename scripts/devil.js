@@ -1,4 +1,3 @@
-// In devil.js
 import * as THREE from 'three';
 const textureLoader = new THREE.TextureLoader();
 
@@ -11,14 +10,8 @@ function loadTexture(path) {
 }
 
 const texture = {
-    devil: loadTexture('textures/devil.png'),
-}
-// const mainTexture = {
-//     devil : {
-//         material: new THREE.MeshLambertMaterial({ map: texture.devil })
-//     }
-// }
-
+  devil: loadTexture('textures/devil.png'),
+};
 
 export class Devil {
   constructor(scene, world, player) {
@@ -30,7 +23,8 @@ export class Devil {
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
-    this.health = 50;
+    this.maxHealth = 50;
+    this.health = this.maxHealth;
     this.damage = 10; // Amount of damage the devil inflicts
     this.attackCooldown = 2; // Time in seconds between attacks
     this.lastAttackTime = 0; // Time of the last attack
@@ -45,6 +39,7 @@ export class Devil {
     );
 
     this.scene.add(this.mesh);
+    this.updateHealthBar(); // Initialize health bar
   }
 
   update(dt) {
@@ -86,8 +81,18 @@ export class Devil {
 
   takeDamage(amount) {
     this.health -= amount;
+    this.health = Math.max(0, this.health); // Prevent health from going below 0
+    this.updateHealthBar();
     if (this.health <= 0) {
       this.die();
+    }
+  }
+
+  updateHealthBar() {
+    const healthBar = document.getElementById('devil-health');
+    if (healthBar) {
+      const healthPercentage = (this.health / this.maxHealth) * 100;
+      healthBar.style.width = `${healthPercentage}%`;
     }
   }
 
@@ -101,7 +106,23 @@ export class Devil {
     // Remove the devil from the game
     console.log('Devil has died!');
 
+    // Show death message
+    const deathMessage = document.getElementById('devil-death-message');
+    if (deathMessage) {
+    //   deathMessage.style.display = 'block';
+    alert('You killed the devil!');
+    }
+
+    // Hide health bar
+    const healthBarContainer = document.getElementById(
+      'devil-health-container'
+    );
+    if (healthBarContainer) {
+      healthBarContainer.style.display = 'none';
+    }
+
     // Remove the global reference
     window.devil = null;
+
   }
 }

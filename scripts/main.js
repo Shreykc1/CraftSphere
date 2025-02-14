@@ -35,7 +35,12 @@ const player = new Player(scene, world);
 const physics = new Physics(scene);
 
 // Camera setup
-const orbitCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const orbitCamera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
 orbitCamera.position.set(24, 24, 24);
 orbitCamera.layers.enable(1);
 
@@ -44,7 +49,7 @@ controls.update();
 
 const modelLoader = new ModelLoader((models) => {
   player.setTool(models.pickaxe);
-})
+});
 
 let sun;
 function setupLights() {
@@ -70,13 +75,24 @@ function setupLights() {
   scene.add(ambient);
 }
 
-
 function spawnDevil() {
   console.log('Spawning new devil');
   devil = new Devil(scene, world, player);
   window.devil = devil;
   devilIsDead = false;
+
+  // Reset health bar and hide death message
+  const deathMessage = document.getElementById('devil-death-message');
+  if (deathMessage) {
+    deathMessage.style.display = 'none';
   }
+
+  const healthBarContainer = document.getElementById('devil-health-container');
+  if (healthBarContainer) {
+    healthBarContainer.style.display = 'block';
+  }
+  devil.updateHealthBar();
+}
 let devilRespawnTimer = 0;
 const DEVIL_RESPAWN_DELAY = 5; // 5 seconds delay
 // Render loop
@@ -96,9 +112,10 @@ function animate() {
 
     // Update devil
     if (devil) {
-        devil.update(dt);
-    } else if(!devilIsDead) {
-            spawnDevil();
+      devil.update(dt);
+      devil.updateHealthBar(); // Update the health bar every frame
+    } else if (!devilIsDead) {
+      spawnDevil();
     }
 
     // Position the sun relative to the player. Need to adjust both the
@@ -112,7 +129,10 @@ function animate() {
     controls.target.copy(player.position);
   }
 
-  renderer.render(scene, player.controls.isLocked ? player.camera : orbitCamera);
+  renderer.render(
+    scene,
+    player.controls.isLocked ? player.camera : orbitCamera
+  );
   stats.update();
 
   previousTime = currentTime;
@@ -133,5 +153,5 @@ setupLights();
 player.updateHealthBar();
 // Create the devil after the scene is set up
 devil = new Devil(scene, world, player);
-window.devil = devil
+window.devil = devil;
 animate();
